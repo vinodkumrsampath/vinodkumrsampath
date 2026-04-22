@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.*.local
+dist/
+.next/
+.turbo/
+*.log
+.DS_Store
+coverage/
+# Face API model weights (download separately)
+server/models/
+# Expo
+apps/mobile/.expo/
+apps/mobile/android/
+apps/mobile/ios/

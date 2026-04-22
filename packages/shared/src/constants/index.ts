@@ -1,0 +1,13 @@
+export const MATCH_EXPIRY_HOURS = 72;
+export const SLOW_MATCH_INTRO_HOURS = 48;
+export const MAX_VERIFICATION_ATTEMPTS = 3;
+export const FACE_MATCH_THRESHOLD = 0.90;
+export const MODERATION_AUTO_REMOVE_THRESHOLD = 0.95;
+export const MODERATION_HUMAN_REVIEW_THRESHOLD = 0.30;
+export const AD_CARD_FREQUENCY = 8;
+export const MAX_PROFILE_PHOTOS = 6;
+export const MIN_PROFILE_PHOTOS = 2;
+export const MAX_BIO_LENGTH = 500;
+export const MAX_PROMPT_ANSWER_LENGTH = 150;
+export const OTP_EXPIRY_MINUTES = 10;
+export const DEFAULT_MATCH_DISTANCE_KM = 50;
