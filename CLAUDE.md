@@ -20,9 +20,7 @@ verified/
 ├── packages/
 │   ├── shared/       # Types, validators, constants shared by all apps
 │   └── config/       # Base tsconfig.json and eslint config
-├── server/           # Fastify API server
-└── infrastructure/
-    └── docker-compose.yml   # PostgreSQL + PostGIS + Redis
+└── server/           # Fastify API server
 ```
 
 ---
@@ -34,8 +32,8 @@ verified/
 | Frontend web | Next.js 14 (App Router), TypeScript, Tailwind CSS, Zustand, framer-motion |
 | Frontend mobile | Expo 51, React Native, expo-router, react-native-reanimated |
 | API server | Node.js, Fastify 4, Zod validation |
-| Database | PostgreSQL 16 + PostGIS (geo queries) |
-| Cache / queues | Redis + BullMQ |
+| Database | PostgreSQL 16 + PostGIS — hosted free on **Neon** |
+| Cache / queues | Redis + BullMQ — hosted free on **Upstash** |
 | Real-time | Socket.io |
 | Auth | JWT (access 15m + refresh 30d), email OTP via Nodemailer |
 | File storage | Cloudflare R2 (S3-compatible, free 10 GB) |
@@ -44,41 +42,85 @@ verified/
 | Text moderation | Hugging Face free inference API (toxic-bert), keyword fallback |
 | Monorepo | Turborepo |
 
-**Zero mandatory paid services** — the stack runs free locally and at small scale.
+**Zero mandatory paid services** — the entire stack runs free at small scale with no Docker required.
 
 ---
 
 ## Dev environment setup
 
 ### 1. Prerequisites
-- Node.js ≥ 20
-- Docker + Docker Compose
 
-### 2. Start databases
-```bash
-docker compose -f infrastructure/docker-compose.yml up -d
-```
+- Node.js ≥ 20 (install via [nvm](https://github.com/nvm-sh/nvm) or [fnm](https://github.com/Schniz/fnm))
+
+No Docker needed. Databases are hosted on free cloud services.
+
+---
+
+### 2. Provision free databases
+
+#### PostgreSQL + PostGIS → Neon (free tier)
+
+1. Sign up at [neon.tech](https://neon.tech) — no credit card required
+2. Create a new project → copy the **connection string** (looks like `postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require`)
+3. In the Neon SQL editor, enable PostGIS:
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS postgis;
+   CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+   CREATE EXTENSION IF NOT EXISTS pg_trgm;
+   ```
+
+#### Redis → Upstash (free tier)
+
+1. Sign up at [upstash.com](https://upstash.com) — no credit card required
+2. Create a new Redis database → select the region closest to you
+3. Copy the **Redis URL** from the dashboard (looks like `rediss://default:xxx@xxx.upstash.io:6379`)
+
+> **Local alternative (macOS):** `brew install postgresql postgis redis && brew services start postgresql redis`
+> **Local alternative (Ubuntu):** `sudo apt install postgresql postgresql-contrib postgis redis-server`
+
+---
 
 ### 3. Environment variables
+
 ```bash
 cp .env.example .env
-# Edit .env — minimum required:
-#   DATABASE_URL, REDIS_URL, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
-#   SMTP_HOST / SMTP_USER / SMTP_PASS  (Gmail SMTP works free)
 ```
+
+Edit `.env` with your Neon + Upstash connection strings:
+
+```bash
+DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require
+REDIS_URL=rediss://default:xxx@xxx.upstash.io:6379
+
+JWT_ACCESS_SECRET=<run: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))">
+JWT_REFRESH_SECRET=<run same command again>
+
+# Gmail SMTP — free, enable App Password at myaccount.google.com/apppasswords
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your_16_char_app_password
+```
+
+---
 
 ### 4. Install and migrate
+
 ```bash
 npm install
-npm run db:migrate      # runs server/src/db/migrate.ts
+npm run db:migrate      # applies server/src/db/migrations/*.sql in order
 ```
 
+---
+
 ### 5. Run all apps
+
 ```bash
-npm run dev             # starts web (3000), server (3001), both via Turborepo
+npm run dev             # starts web on :3000 and server on :3001 via Turborepo
 ```
 
 ### 6. Mobile only
+
 ```bash
 cd apps/mobile
 npx expo start
@@ -95,6 +137,21 @@ npx expo start
 | `npm run db:migrate` | Apply pending SQL migrations in order |
 | `npm run db:seed` | Seed test users (dev only) |
 | `npm run lint` | TypeScript type-check all packages |
+
+---
+
+## Free service accounts needed
+
+| Service | Purpose | Free tier |
+|---------|---------|-----------|
+| [Neon](https://neon.tech) | PostgreSQL + PostGIS | 512 MB storage, 1 project |
+| [Upstash](https://upstash.com) | Redis (BullMQ queues + cache) | 10k commands/day |
+| [Cloudflare R2](https://dash.cloudflare.com) | Photo + selfie storage | 10 GB, 1M reads/month |
+| Gmail SMTP | Email OTP delivery | Free with App Password |
+| [Hugging Face](https://huggingface.co/settings/tokens) | Text moderation API | Free inference tier |
+| [Resend](https://resend.com) | Alternative email provider | 3,000 emails/month free |
+
+All are optional except Neon (database) and SMTP (email OTP). The app degrades gracefully if R2 or Hugging Face are not configured.
 
 ---
 
@@ -370,16 +427,38 @@ OTP_EXPIRY_MINUTES = 10
 See `.env.example` for full list. Required for local dev:
 
 ```
-DATABASE_URL=postgresql://verified:verified_dev@localhost:5432/verified
-REDIS_URL=redis://localhost:6379
-JWT_ACCESS_SECRET=<32+ random chars>
-JWT_REFRESH_SECRET=<32+ random chars>
-SMTP_HOST / SMTP_USER / SMTP_PASS    # Gmail SMTP works free
+# Neon PostgreSQL (get from neon.tech dashboard)
+DATABASE_URL=postgresql://user:pass@ep-xxx.us-east-1.aws.neon.tech/neondb?sslmode=require
+
+# Upstash Redis (get from upstash.com dashboard)
+REDIS_URL=rediss://default:xxx@xxx.upstash.io:6379
+
+# JWT secrets — generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+JWT_ACCESS_SECRET=<64 hex chars>
+JWT_REFRESH_SECRET=<64 hex chars>
+
+# Gmail SMTP — enable App Password at myaccount.google.com/apppasswords
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your@gmail.com
+SMTP_PASS=your_16_char_app_password
 ```
 
 Optional (app works without them, features degrade gracefully):
+
 ```
-R2_ENDPOINT / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_BUCKET   # photo storage
-HUGGINGFACE_API_KEY                                                  # better text moderation
-STRIPE_SECRET_KEY / STRIPE_PREMIUM_PRICE_ID                         # ad-free subscriptions
+# Cloudflare R2 photo storage (free 10 GB)
+R2_ENDPOINT=https://<account_id>.r2.cloudflarestorage.com
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=verified-photos
+R2_PUBLIC_URL=https://pub-<hash>.r2.dev
+
+# Better text moderation (free tier at huggingface.co/settings/tokens)
+HUGGINGFACE_API_KEY=
+
+# Ad-free premium subscriptions (only needed when monetising)
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_PREMIUM_PRICE_ID=
 ```
